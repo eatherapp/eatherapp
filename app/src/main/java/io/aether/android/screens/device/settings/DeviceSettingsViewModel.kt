@@ -47,6 +47,16 @@ import kotlinx.coroutines.selects.onTimeout
 import kotlinx.coroutines.selects.select
 import timber.log.Timber
 
+data class DeviceSettingsUiState(
+    val content: DeviceSettingsViewModel.ContentState = DeviceSettingsViewModel.ContentState.Loading,
+    val msgDialogInfo: DialogInfo? = null,
+    val showShareDeviceAlertDialog: Boolean = false,
+    val showRemoveDeviceAlertDialog: Boolean = false,
+    val showRemoveDeviceConfirmAlertDialog: Boolean = false,
+    val deviceRemovalCompleted: Boolean = false,
+    val pairingWindowOpenForDeviceSharing: Boolean = false,
+)
+
 @HiltViewModel
 class DeviceSettingsViewModel
 @Inject
@@ -58,33 +68,33 @@ constructor(
     private val setDeviceNameUseCase: SetDeviceNameUseCase,
 ) : ViewModel() {
 
-  sealed interface UiState {
-    data object Loading : UiState
+  sealed interface ContentState {
+    data object Loading : ContentState
 
     data class Loaded(
         val device: Device,
         val basicInformation: BasicInformationAttributes?,
         val isOnline: Boolean,
         val dateCommissioned: Timestamp?,
-    ) : UiState
+    ) : ContentState
 
-    data class Error(@field:StringRes val messageRes: Int) : UiState
+    data class Error(@field:StringRes val messageRes: Int) : ContentState
   }
 
   private val refreshTrigger = MutableSharedFlow<NodeId>(replay = 1)
 
   @OptIn(ExperimentalCoroutinesApi::class)
-  val uiState: StateFlow<UiState> =
+  private val contentState: StateFlow<ContentState> =
       refreshTrigger
           .flatMapLatest { nodeId ->
             flow {
               // Use existing state as a local cache: emit stale data immediately so the UI
               // never flashes "Loading" or shows unknown values while refreshing.
-              val cached = uiState.value
-              if (cached is UiState.Loaded && cached.device.nodeId == nodeId) {
+              val cached = contentState.value
+              if (cached is ContentState.Loaded && cached.device.nodeId == nodeId) {
                 emit(cached)
               } else {
-                emit(UiState.Loading)
+                emit(ContentState.Loading)
               }
               coroutineScope {
                 // Kick off the network read immediately (async) so total wait time is
@@ -103,7 +113,7 @@ constructor(
                       .getOrDefault(fallbackDevice)
                 }
                 val cachedBasicInfo =
-                    (cached as? UiState.Loaded)
+                    (cached as? ContentState.Loaded)
                         ?.takeIf { it.device.nodeId == nodeId }
                         ?.basicInformation
                 // Race the local storage fetch against the timeout.
@@ -113,24 +123,24 @@ constructor(
                       onTimeout(500.milliseconds) {
                         Timber.d("Storage read took too long. Emitting fallback first.")
                         // Emit fallback right away so the UI doesn't freeze, then keep waiting.
-                        emit(UiState.Loaded(fallbackDevice, cachedBasicInfo, false, null))
+                        emit(ContentState.Loaded(fallbackDevice, cachedBasicInfo, false, null))
                         deviceDeferred.await()
                       }
                     }
                 // Emit storage-fresh device with cached basicInfo so e.g. a rename is
                 // reflected immediately without waiting for the network round-trip.
-                emit(UiState.Loaded(device, cachedBasicInfo, false, null))
+                emit(ContentState.Loaded(device, cachedBasicInfo, false, null))
                 // Await network result and update with live basic information.
                 val basicInfo = networkDeferred.await()
                 if (basicInfo != null) {
                   syncBasicInfoToStorage(nodeId, basicInfo)
-                  emit(UiState.Loaded(device, basicInfo, false, null))
+                  emit(ContentState.Loaded(device, basicInfo, false, null))
                 }
               }
             }
           }
           .combine(devicesStateRepository.devicesStateFlow) { deviceState, nodesState ->
-            if (deviceState !is UiState.Loaded) return@combine deviceState
+            if (deviceState !is ContentState.Loaded) return@combine deviceState
             val node =
                 nodesState.nodesList.firstOrNull { it.nodeId == deviceState.device.nodeId.toLong() }
             deviceState.copy(
@@ -138,7 +148,7 @@ constructor(
                 dateCommissioned = node?.dateCommissioned?.takeUnless { isDefaultTimestamp(it) },
             )
           }
-          .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), UiState.Loading)
+          .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), ContentState.Loading)
 
   fun loadDevice(nodeId: NodeId) {
     refreshTrigger.tryEmit(nodeId)
@@ -167,26 +177,51 @@ constructor(
 
   // Controls whether the "Message" AlertDialog should be shown in the UI.
   private var _msgDialogInfo = MutableStateFlow<DialogInfo?>(null)
-  val msgDialogInfo: StateFlow<DialogInfo?> = _msgDialogInfo.asStateFlow()
 
   private var _showShareDeviceAlertDialog = MutableStateFlow(false)
-  val showShareDeviceAlertDialog: StateFlow<Boolean> = _showShareDeviceAlertDialog.asStateFlow()
 
   private var _showRemoveDeviceAlertDialog = MutableStateFlow(false)
-  val showRemoveDeviceAlertDialog: StateFlow<Boolean> = _showRemoveDeviceAlertDialog.asStateFlow()
 
   private var _showRemoveDeviceConfirmAlertDialog = MutableStateFlow(false)
-  val showRemoveDeviceConfirmAlertDialog: StateFlow<Boolean> =
-      _showRemoveDeviceConfirmAlertDialog.asStateFlow()
 
   // Communicates to the UI that removal of the device has completed successfully.
   private var _deviceRemovalCompleted = MutableStateFlow(false)
-  val deviceRemovalCompleted: StateFlow<Boolean> = _deviceRemovalCompleted.asStateFlow()
 
   // Communicates to the UI that the pairing window is open for device sharing.
   private var _pairingWindowOpenForDeviceSharing = MutableStateFlow(false)
-  val pairingWindowOpenForDeviceSharing: StateFlow<Boolean> =
-      _pairingWindowOpenForDeviceSharing.asStateFlow()
+  val uiState: StateFlow<DeviceSettingsUiState> =
+      combine(
+              contentState,
+              _msgDialogInfo.asStateFlow(),
+              _showShareDeviceAlertDialog.asStateFlow(),
+              _showRemoveDeviceAlertDialog.asStateFlow(),
+              _showRemoveDeviceConfirmAlertDialog.asStateFlow(),
+          ) {
+              content,
+              msgDialogInfo,
+              showShareDeviceAlertDialog,
+              showRemoveDeviceAlertDialog,
+              showRemoveDeviceConfirmAlertDialog,
+            ->
+            DeviceSettingsUiState(
+                content = content,
+                msgDialogInfo = msgDialogInfo,
+                showShareDeviceAlertDialog = showShareDeviceAlertDialog,
+                showRemoveDeviceAlertDialog = showRemoveDeviceAlertDialog,
+                showRemoveDeviceConfirmAlertDialog = showRemoveDeviceConfirmAlertDialog,
+                deviceRemovalCompleted = _deviceRemovalCompleted.value,
+                pairingWindowOpenForDeviceSharing = _pairingWindowOpenForDeviceSharing.value,
+            )
+          }
+          .combine(_deviceRemovalCompleted.asStateFlow()) { state, deviceRemovalCompleted ->
+            state.copy(deviceRemovalCompleted = deviceRemovalCompleted)
+          }
+          .combine(_pairingWindowOpenForDeviceSharing.asStateFlow()) {
+              state,
+              pairingWindowOpenForDeviceSharing ->
+            state.copy(pairingWindowOpenForDeviceSharing = pairingWindowOpenForDeviceSharing)
+          }
+          .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), DeviceSettingsUiState())
 
   // -----------------------------------------------------------------------------------------------
   // Rename device

@@ -27,6 +27,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.stateIn
@@ -69,6 +70,24 @@ data class ExplorerClusterDetails(
     val events: List<ExplorerEventUiItem> = emptyList(),
 )
 
+data class ExplorerUiState(
+    val content: ExplorerViewModel.ContentState = ExplorerViewModel.ContentState.Loading,
+    val navStack: List<ExplorerLevel> = listOf(ExplorerLevel.EndpointList),
+    val endpointSearchQuery: String = "",
+    val clusterSearchQuery: String = "",
+    val attributeSearchQuery: String = "",
+    val commandSearchQuery: String = "",
+    val eventSearchQuery: String = "",
+    val loadingClusterKeys: Set<ExplorerClusterKey> = emptySet(),
+    val clusterDetailsByKey: Map<ExplorerClusterKey, ExplorerClusterDetails> = emptyMap(),
+    val attributeValueByKey: Map<String, String> = emptyMap(),
+    val attributeReadSuccessCount: Int = 0,
+    val attributeWriteSuccessCount: Int = 0,
+    val commandInvokeSuccessCount: Int = 0,
+    val msgDialogInfo: DialogInfo? = null,
+    val knownClustersById: Map<ClusterId, ExplorerClusterDefinition> = emptyMap(),
+)
+
 sealed class ExplorerLevel {
   object EndpointList : ExplorerLevel()
 
@@ -100,36 +119,36 @@ constructor(
     private val clustersHelper: ClustersHelper,
 ) : ViewModel() {
 
-  sealed interface UiState {
-    data object Loading : UiState
+  sealed interface ContentState {
+    data object Loading : ContentState
 
-    data class Loaded(val deviceMatterInfoList: List<DeviceMatterInfo>) : UiState
+    data class Loaded(val deviceMatterInfoList: List<DeviceMatterInfo>) : ContentState
 
-    data class Error(@field:StringRes val messageRes: Int) : UiState
+    data class Error(@field:StringRes val messageRes: Int) : ContentState
   }
 
   private val refreshTrigger = MutableSharedFlow<NodeId>(replay = 1)
 
   @OptIn(ExperimentalCoroutinesApi::class)
-  val uiState: StateFlow<UiState> =
+  private val contentState: StateFlow<ContentState> =
       refreshTrigger
           .flatMapLatest { nodeId ->
             flow {
-              emit(UiState.Loading)
+              emit(ContentState.Loading)
               emit(
                   runCatching {
-                    UiState.Loaded(
+                    ContentState.Loaded(
                         clustersHelper.fetchDeviceMatterInfo(nodeId).sortedBy { it.endpointId }
                     )
                   }
                       .getOrElse {
                         Timber.e(it, "loadExplorer failed")
-                        UiState.Error(R.string.device_explorer_error_action_failed)
+                        ContentState.Error(R.string.device_explorer_error_action_failed)
                       }
               )
             }
           }
-          .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), UiState.Loading)
+          .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), ContentState.Loading)
 
   fun loadExplorer(nodeId: NodeId) = refreshTrigger.tryEmit(nodeId)
 
@@ -169,15 +188,69 @@ constructor(
   val attributeWriteSuccessCount: StateFlow<Int> = _attributeWriteSuccessCount.asStateFlow()
 
   private val _commandInvokeSuccessCount = MutableStateFlow(0)
-  val commandInvokeSuccessCount: StateFlow<Int> = _commandInvokeSuccessCount.asStateFlow()
 
   private val _msgDialogInfo = MutableStateFlow<DialogInfo?>(null)
-  val msgDialogInfo: StateFlow<DialogInfo?> = _msgDialogInfo.asStateFlow()
 
   private val _knownClustersById =
       MutableStateFlow<Map<ClusterId, ExplorerClusterDefinition>>(emptyMap())
-  val knownClustersById: StateFlow<Map<ClusterId, ExplorerClusterDefinition>> =
-      _knownClustersById.asStateFlow()
+
+  val uiState: StateFlow<ExplorerUiState> =
+      combine(
+              contentState,
+              _navStack.asStateFlow(),
+              _endpointSearchQuery.asStateFlow(),
+              _clusterSearchQuery.asStateFlow(),
+              _attributeSearchQuery.asStateFlow(),
+          ) { content, navStack, endpointSearchQuery, clusterSearchQuery, attributeSearchQuery ->
+            ExplorerUiState(
+                content = content,
+                navStack = navStack,
+                endpointSearchQuery = endpointSearchQuery,
+                clusterSearchQuery = clusterSearchQuery,
+                attributeSearchQuery = attributeSearchQuery,
+                commandSearchQuery = _commandSearchQuery.value,
+                eventSearchQuery = _eventSearchQuery.value,
+                loadingClusterKeys = _loadingClusterKeys.value,
+                clusterDetailsByKey = _clusterDetailsByKey.value,
+                attributeValueByKey = _attributeValueByKey.value,
+                attributeReadSuccessCount = _attributeReadSuccessCount.value,
+                attributeWriteSuccessCount = _attributeWriteSuccessCount.value,
+                commandInvokeSuccessCount = _commandInvokeSuccessCount.value,
+                msgDialogInfo = _msgDialogInfo.value,
+                knownClustersById = _knownClustersById.value,
+            )
+          }
+          .combine(_commandSearchQuery.asStateFlow()) { state, commandSearchQuery ->
+            state.copy(commandSearchQuery = commandSearchQuery)
+          }
+          .combine(_eventSearchQuery.asStateFlow()) { state, eventSearchQuery ->
+            state.copy(eventSearchQuery = eventSearchQuery)
+          }
+          .combine(_loadingClusterKeys.asStateFlow()) { state, loadingClusterKeys ->
+            state.copy(loadingClusterKeys = loadingClusterKeys)
+          }
+          .combine(_clusterDetailsByKey.asStateFlow()) { state, clusterDetailsByKey ->
+            state.copy(clusterDetailsByKey = clusterDetailsByKey)
+          }
+          .combine(_attributeValueByKey.asStateFlow()) { state, attributeValueByKey ->
+            state.copy(attributeValueByKey = attributeValueByKey)
+          }
+          .combine(_attributeReadSuccessCount.asStateFlow()) { state, attributeReadSuccessCount ->
+            state.copy(attributeReadSuccessCount = attributeReadSuccessCount)
+          }
+          .combine(_attributeWriteSuccessCount.asStateFlow()) { state, attributeWriteSuccessCount ->
+            state.copy(attributeWriteSuccessCount = attributeWriteSuccessCount)
+          }
+          .combine(_commandInvokeSuccessCount.asStateFlow()) { state, commandInvokeSuccessCount ->
+            state.copy(commandInvokeSuccessCount = commandInvokeSuccessCount)
+          }
+          .combine(_msgDialogInfo.asStateFlow()) { state, msgDialogInfo ->
+            state.copy(msgDialogInfo = msgDialogInfo)
+          }
+          .combine(_knownClustersById.asStateFlow()) { state, knownClustersById ->
+            state.copy(knownClustersById = knownClustersById)
+          }
+          .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), ExplorerUiState())
 
   init {
     viewModelScope.launch(Dispatchers.IO) {

@@ -76,20 +76,7 @@ fun DeviceSettingsRoute(
   val activity = LocalContext.current.getActivity()
 
   val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-  val device = (uiState as? DeviceSettingsViewModel.UiState.Loaded)?.device
-  val basicInformation = (uiState as? DeviceSettingsViewModel.UiState.Loaded)?.basicInformation
-  val isOnline = (uiState as? DeviceSettingsViewModel.UiState.Loaded)?.isOnline ?: false
-  val dateCommissioned = (uiState as? DeviceSettingsViewModel.UiState.Loaded)?.dateCommissioned
-  val msgDialogInfo by viewModel.msgDialogInfo.collectAsStateWithLifecycle()
-  val showShareDeviceAlertDialog by
-      viewModel.showShareDeviceAlertDialog.collectAsStateWithLifecycle()
-  val showRemoveDeviceAlertDialog by
-      viewModel.showRemoveDeviceAlertDialog.collectAsStateWithLifecycle()
-  val showRemoveDeviceConfirmAlertDialog by
-      viewModel.showRemoveDeviceConfirmAlertDialog.collectAsStateWithLifecycle()
-  val deviceRemovalCompleted by viewModel.deviceRemovalCompleted.collectAsStateWithLifecycle()
-  val pairingWindowOpenForDeviceSharing by
-      viewModel.pairingWindowOpenForDeviceSharing.collectAsStateWithLifecycle()
+  val loadedContent = uiState.content as? DeviceSettingsViewModel.ContentState.Loaded
 
   // GPS share activity launcher.
   val shareDeviceLauncher =
@@ -104,10 +91,10 @@ fun DeviceSettingsRoute(
       }
 
   // Launch the GPS share activity once the pairing window is open.
-  if (pairingWindowOpenForDeviceSharing) {
-    val deviceName = device?.name ?: ""
-    LaunchedEffect(pairingWindowOpenForDeviceSharing) {
-      if (pairingWindowOpenForDeviceSharing) {
+  if (uiState.pairingWindowOpenForDeviceSharing) {
+    val deviceName = loadedContent?.device?.name ?: ""
+    LaunchedEffect(uiState.pairingWindowOpenForDeviceSharing) {
+      if (uiState.pairingWindowOpenForDeviceSharing) {
         viewModel.resetPairingWindowOpenForDeviceSharing()
         activity?.let { act ->
           shareDevice(
@@ -122,7 +109,7 @@ fun DeviceSettingsRoute(
   }
 
   // Navigate back to home when removal is done.
-  if (deviceRemovalCompleted) {
+  if (uiState.deviceRemovalCompleted) {
     navigateToHome()
     viewModel.resetDeviceRemovalCompleted()
   }
@@ -149,14 +136,7 @@ fun DeviceSettingsRoute(
   ) { innerPadding ->
     val modifierWithInnerPadding = Modifier.fillMaxSize().padding(innerPadding)
     DeviceSettingsScreen(
-        device = device,
-        basicInformation = basicInformation,
-        isOnline = isOnline,
-        dateCommissioned = dateCommissioned,
-        msgDialogInfo = msgDialogInfo,
-        showShareDeviceAlertDialog = showShareDeviceAlertDialog,
-        showRemoveDeviceAlertDialog = showRemoveDeviceAlertDialog,
-        showRemoveDeviceConfirmAlertDialog = showRemoveDeviceConfirmAlertDialog,
+        uiState = uiState,
         onDismissMsgDialog = { viewModel.dismissMsgDialog() },
         onDeviceNameChange = { name -> viewModel.renameDevice(nodeId, name) },
         onDeviceTypeChange = { type -> viewModel.changeDeviceType(nodeId, type) },
@@ -184,14 +164,7 @@ fun DeviceSettingsRoute(
 
 @Composable
 private fun DeviceSettingsScreen(
-    device: Device?,
-    basicInformation: BasicInformationAttributes?,
-    isOnline: Boolean,
-    dateCommissioned: Timestamp?,
-    msgDialogInfo: DialogInfo?,
-    showShareDeviceAlertDialog: Boolean,
-    showRemoveDeviceAlertDialog: Boolean,
-    showRemoveDeviceConfirmAlertDialog: Boolean,
+    uiState: DeviceSettingsUiState,
     onDismissMsgDialog: () -> Unit,
     onDeviceNameChange: (String) -> Unit,
     onDeviceTypeChange: (DeviceTypeId) -> Unit,
@@ -205,15 +178,21 @@ private fun DeviceSettingsScreen(
     onForceRemoveDeviceResult: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+  val content = uiState.content
+  val loadedContent = content as? DeviceSettingsViewModel.ContentState.Loaded
 
-  if (msgDialogInfo != null) {
-    MsgAlertDialog(msgDialogInfo, onDismissMsgDialog)
+  if (uiState.msgDialogInfo != null) {
+    MsgAlertDialog(uiState.msgDialogInfo, onDismissMsgDialog)
   }
 
-  if (device == null) {
+  if (loadedContent == null) {
     LoadingIndicator(stringResource(R.string.loading_device_info), modifier = modifier)
     return
   }
+  val device = loadedContent.device
+  val basicInformation = loadedContent.basicInformation
+  val isOnline = loadedContent.isOnline
+  val dateCommissioned = loadedContent.dateCommissioned
 
   var showRenameDialog by remember { mutableStateOf(false) }
   var showTypeDialog by remember { mutableStateOf(false) }
@@ -244,21 +223,21 @@ private fun DeviceSettingsScreen(
     )
   }
 
-  if (showShareDeviceAlertDialog) {
+  if (uiState.showShareDeviceAlertDialog) {
     ShareDeviceConfirmationDialog(
         onConfirm = { onShareDeviceResult(true) },
         onDismissRequest = { onShareDeviceResult(false) },
     )
   }
 
-  if (showRemoveDeviceAlertDialog) {
+  if (uiState.showRemoveDeviceAlertDialog) {
     RemoveDeviceConfirmationDialog(
         onConfirm = { onRemoveDeviceResult(true) },
         onDismissRequest = { onRemoveDeviceResult(false) },
     )
   }
 
-  if (showRemoveDeviceConfirmAlertDialog) {
+  if (uiState.showRemoveDeviceConfirmAlertDialog) {
     ForceRemoveDeviceConfirmationDialog(
         onConfirm = { onForceRemoveDeviceResult(true) },
         onDismissRequest = { onForceRemoveDeviceResult(false) },

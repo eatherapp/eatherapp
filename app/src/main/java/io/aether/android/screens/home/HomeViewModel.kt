@@ -10,7 +10,6 @@ import android.os.SystemClock
 import androidx.activity.result.ActivityResult
 import androidx.annotation.StringRes
 import androidx.lifecycle.ViewModel
-import androidx.lifecycle.asLiveData
 import androidx.lifecycle.liveData
 import androidx.lifecycle.viewModelScope
 import chip.devicecontroller.AttestationInfo
@@ -56,9 +55,11 @@ import java.time.LocalDateTime
 import javax.inject.Inject
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import timber.log.Timber
 
@@ -104,6 +105,15 @@ data class DevicesListUiModel(
     val showOfflineDevices: Boolean,
 )
 
+data class HomeUiState(
+    val devices: List<DeviceUiModel> = emptyList(),
+    val showOfflineDevices: Boolean = true,
+    val msgDialogInfo: DialogInfo? = null,
+    val showNewDeviceNameAlertDialog: Boolean = false,
+    val multiadminCommissionDeviceTaskStatus: TaskStatus = TaskStatus.NotStarted,
+    val deviceAttestationFailureIgnored: Boolean = true,
+)
+
 // -----------------------------------------------------------------------------
 // ViewModel
 
@@ -122,23 +132,17 @@ constructor(
 
   // Controls whether the "Message" AlertDialog should be shown in the UI.
   private var _msgDialogInfo = MutableStateFlow<DialogInfo?>(null)
-  val msgDialogInfo: StateFlow<DialogInfo?> = _msgDialogInfo.asStateFlow()
 
   // Controls whether the "New Device" AlertDialog should be shown in the UI.
   private var _showNewDeviceNameAlertDialog = MutableStateFlow(false)
-  val showNewDeviceNameAlertDialog: StateFlow<Boolean> = _showNewDeviceNameAlertDialog.asStateFlow()
 
   /** The current status of multiadmin commissioning. */
   private val _multiadminCommissionDeviceTaskStatus =
       MutableStateFlow<TaskStatus>(TaskStatus.NotStarted)
-  val multiadminCommissionDeviceTaskStatus: StateFlow<TaskStatus> =
-      _multiadminCommissionDeviceTaskStatus.asStateFlow()
 
   // Controls whether a Device Attestation failure is ignored or not.
   // FIXME: set to true for now until issues with attestation resolved.
   private var _deviceAttestationFailureIgnored = MutableStateFlow(true)
-  val deviceAttestationFailureIgnored: StateFlow<Boolean> =
-      _deviceAttestationFailureIgnored.asStateFlow()
 
   // Controls whether a periodic ping to the devices is enabled or not.
   private var devicesPeriodicPingEnabled: Boolean = true
@@ -174,7 +178,30 @@ constructor(
         )
       }
 
-  val devicesUiModelLiveData = devicesListUiModelFlow.asLiveData()
+  val uiState: StateFlow<HomeUiState> =
+      combine(
+              devicesListUiModelFlow,
+              _msgDialogInfo.asStateFlow(),
+              _showNewDeviceNameAlertDialog.asStateFlow(),
+              _multiadminCommissionDeviceTaskStatus.asStateFlow(),
+              _deviceAttestationFailureIgnored.asStateFlow(),
+          ) {
+              devicesUiModel,
+              msgDialogInfo,
+              showNewDeviceNameAlertDialog,
+              multiadminCommissionDeviceTaskStatus,
+              deviceAttestationFailureIgnored,
+            ->
+            HomeUiState(
+                devices = devicesUiModel.devices,
+                showOfflineDevices = devicesUiModel.showOfflineDevices,
+                msgDialogInfo = msgDialogInfo,
+                showNewDeviceNameAlertDialog = showNewDeviceNameAlertDialog,
+                multiadminCommissionDeviceTaskStatus = multiadminCommissionDeviceTaskStatus,
+                deviceAttestationFailureIgnored = deviceAttestationFailureIgnored,
+            )
+          }
+          .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), HomeUiState())
 
   private fun processDevices(
       devicesStates: MatterFabricState,

@@ -24,7 +24,6 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -46,8 +45,7 @@ internal fun ScannerRoute(
     onBackClick: () -> Unit,
     scannerViewModel: ScannerViewModel = hiltViewModel(),
 ) {
-  val beacons by scannerViewModel.beaconsLiveData.observeAsState()
-  val beaconsList = beacons?.toList() ?: emptyList()
+  val uiState by scannerViewModel.uiState.collectAsStateWithLifecycle()
 
   Scaffold(
       topBar = {
@@ -65,15 +63,15 @@ internal fun ScannerRoute(
       },
   ) { innerPadding ->
     val modifierWithInnerPadding = Modifier.fillMaxSize().padding(innerPadding)
-    ScannerScreen(beaconsList, modifier = modifierWithInnerPadding)
+    ScannerScreen(uiState = uiState, modifier = modifierWithInnerPadding)
   }
 }
 
 @Composable
-private fun ScannerScreen(beaconsList: List<MatterBeacon>, modifier: Modifier = Modifier) {
+private fun ScannerScreen(uiState: ScannerUiState, modifier: Modifier = Modifier) {
   Box(modifier = modifier) {
     LazyColumn(modifier = Modifier.padding(MaterialTheme.spacing.paddingSurfaceContent)) {
-      this.items(beaconsList) { MatterBeaconItem(it) }
+      this.items(uiState.beacons) { MatterBeaconItem(it) }
     }
   }
 }
