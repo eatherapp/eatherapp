@@ -48,7 +48,8 @@ import kotlinx.coroutines.selects.select
 import timber.log.Timber
 
 data class DeviceSettingsUiState(
-    val content: DeviceSettingsViewModel.ContentState = DeviceSettingsViewModel.ContentState.Loading,
+    val content: DeviceSettingsViewModel.ContentState =
+        DeviceSettingsViewModel.ContentState.Loading,
     val msgDialogInfo: DialogInfo? = null,
     val showShareDeviceAlertDialog: Boolean = false,
     val showRemoveDeviceAlertDialog: Boolean = false,
@@ -159,15 +160,15 @@ constructor(
       basicInfo: BasicInformationAttributes,
   ) {
     runCatching {
-      devicesRepository.updateNodeBasicInfo(
-          nodeId,
-          basicInfo.vendorId,
-          basicInfo.vendorName,
-          basicInfo.productId,
-          basicInfo.productName,
-          basicInfo.nodeLabel,
-      )
-    }
+          devicesRepository.updateNodeBasicInfo(
+              nodeId,
+              basicInfo.vendorId,
+              basicInfo.vendorName,
+              basicInfo.productId,
+              basicInfo.productName,
+              basicInfo.nodeLabel,
+          )
+        }
         .onFailure { Timber.e(it, "syncBasicInfoToStorage failed") }
   }
 

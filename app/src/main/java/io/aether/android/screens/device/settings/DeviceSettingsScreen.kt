@@ -40,10 +40,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.google.protobuf.Timestamp
-import io.aether.android.Device
 import io.aether.android.R
-import io.aether.android.chip.BasicInformationAttributes
 import io.aether.android.formatTimestamp
 import io.aether.android.getDeviceTypeDisplayStringId
 import io.aether.android.matter.DeviceTypeId
@@ -51,7 +48,6 @@ import io.aether.android.matter.NodeId
 import io.aether.android.matter.ProductId
 import io.aether.android.matter.VendorId
 import io.aether.android.matter.vendorLabel
-import io.aether.android.screens.common.DialogInfo
 import io.aether.android.screens.common.LoadingIndicator
 import io.aether.android.screens.common.MsgAlertDialog
 import io.aether.android.screens.device.actions.ForceRemoveDeviceConfirmationDialog

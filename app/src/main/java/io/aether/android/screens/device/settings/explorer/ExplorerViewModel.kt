@@ -137,10 +137,10 @@ constructor(
               emit(ContentState.Loading)
               emit(
                   runCatching {
-                    ContentState.Loaded(
-                        clustersHelper.fetchDeviceMatterInfo(nodeId).sortedBy { it.endpointId }
-                    )
-                  }
+                        ContentState.Loaded(
+                            clustersHelper.fetchDeviceMatterInfo(nodeId).sortedBy { it.endpointId }
+                        )
+                      }
                       .getOrElse {
                         Timber.e(it, "loadExplorer failed")
                         ContentState.Error(R.string.device_explorer_error_action_failed)
@@ -350,62 +350,62 @@ constructor(
       try {
         val knownSchema = _knownClustersById.value[clusterId]
 
-        val attributesFromDevice = runCatching {
-          clustersHelper.readClusterAttributeList(nodeId, endpointId, clusterId)
-        }
-            .getOrElse {
-              Timber.w(
-                  it,
-                  "readClusterAttributeList failed endpoint=%s cluster=%s",
-                  endpointId,
-                  clusterId,
-              )
-              emptyList()
-            }
-        val commandsFromDevice = runCatching {
-          clustersHelper.readClusterAcceptedCommandList(
-              nodeId,
-              endpointId,
-              clusterId,
-          )
-        }
-            .getOrElse {
-              Timber.w(
-                  it,
-                  "readClusterAcceptedCommandList failed endpoint=%s cluster=%s",
-                  endpointId,
-                  clusterId,
-              )
-              emptyList()
-            }
-        val generatedCommandsFromDevice = runCatching {
-          clustersHelper.readClusterGeneratedCommandList(
-              nodeId,
-              endpointId,
-              clusterId,
-          )
-        }
-            .getOrElse {
-              Timber.w(
-                  it,
-                  "readClusterGeneratedCommandList failed endpoint=%s cluster=%s",
-                  endpointId,
-                  clusterId,
-              )
-              emptyList()
-            }
-        val eventsFromDevice = runCatching {
-          clustersHelper.readClusterEventList(nodeId, endpointId, clusterId)
-        }
-            .getOrElse {
-              Timber.w(
-                  it,
-                  "readClusterEventList failed endpoint=%s cluster=%s",
-                  endpointId,
-                  clusterId,
-              )
-              emptyList()
-            }
+        val attributesFromDevice =
+            runCatching { clustersHelper.readClusterAttributeList(nodeId, endpointId, clusterId) }
+                .getOrElse {
+                  Timber.w(
+                      it,
+                      "readClusterAttributeList failed endpoint=%s cluster=%s",
+                      endpointId,
+                      clusterId,
+                  )
+                  emptyList()
+                }
+        val commandsFromDevice =
+            runCatching {
+                  clustersHelper.readClusterAcceptedCommandList(
+                      nodeId,
+                      endpointId,
+                      clusterId,
+                  )
+                }
+                .getOrElse {
+                  Timber.w(
+                      it,
+                      "readClusterAcceptedCommandList failed endpoint=%s cluster=%s",
+                      endpointId,
+                      clusterId,
+                  )
+                  emptyList()
+                }
+        val generatedCommandsFromDevice =
+            runCatching {
+                  clustersHelper.readClusterGeneratedCommandList(
+                      nodeId,
+                      endpointId,
+                      clusterId,
+                  )
+                }
+                .getOrElse {
+                  Timber.w(
+                      it,
+                      "readClusterGeneratedCommandList failed endpoint=%s cluster=%s",
+                      endpointId,
+                      clusterId,
+                  )
+                  emptyList()
+                }
+        val eventsFromDevice =
+            runCatching { clustersHelper.readClusterEventList(nodeId, endpointId, clusterId) }
+                .getOrElse {
+                  Timber.w(
+                      it,
+                      "readClusterEventList failed endpoint=%s cluster=%s",
+                      endpointId,
+                      clusterId,
+                  )
+                  emptyList()
+                }
 
         val knownAttributes = knownSchema?.attributes.orEmpty().associateBy { it.id }
         val knownCommands = knownSchema?.commands.orEmpty().associateBy { it.id }

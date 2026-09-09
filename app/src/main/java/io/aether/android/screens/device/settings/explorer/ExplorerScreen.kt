@@ -156,11 +156,11 @@ fun ExplorerRoute(
                 attribute = level.attribute,
                 currentValue =
                     uiState.attributeValueByKey[
-                        viewModel.attributeKey(
-                            level.endpointId,
-                            level.clusterId,
-                            level.attribute.id,
-                        )],
+                            viewModel.attributeKey(
+                                level.endpointId,
+                                level.clusterId,
+                                level.attribute.id,
+                            )],
                 readSuccessCount = uiState.attributeReadSuccessCount,
                 writeSuccessCount = uiState.attributeWriteSuccessCount,
                 onRead = {

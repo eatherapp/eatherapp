@@ -4,9 +4,9 @@
 
 package io.aether.android.screens.device
 
-import androidx.lifecycle.asFlow
 import androidx.annotation.StringRes
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.asFlow
 import androidx.lifecycle.viewModelScope
 import chip.devicecontroller.model.NodeState
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -38,8 +38,8 @@ import java.time.LocalDateTime
 import javax.inject.Inject
 import kotlin.time.Duration.Companion.milliseconds
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
@@ -72,26 +72,30 @@ constructor(
 
   // The UI model for device shown on the Device screen.
   private var _deviceUiModel = MutableStateFlow<DeviceUiModel?>(null)
+  private val deviceUiModel: StateFlow<DeviceUiModel?> = _deviceUiModel.asStateFlow()
 
   // All endpoint UI models for the same physical node shown on the Device screen.
   // Sorted by ascending endpoint number.
   private var _allEndpointUiModels = MutableStateFlow<List<DeviceUiModel>>(emptyList())
+  private val allEndpointUiModels: StateFlow<List<DeviceUiModel>> =
+      _allEndpointUiModels.asStateFlow()
 
   // Controls whether a periodic ping to the device is enabled or not.
   private var devicePeriodicPingEnabled: Boolean = true
 
   // Controls whether the "Message" AlertDialog should be shown in the UI.
   private var _msgDialogInfo = MutableStateFlow<DialogInfo?>(null)
+  private val msgDialogInfo: StateFlow<DialogInfo?> = _msgDialogInfo.asStateFlow()
 
   val uiState: StateFlow<DeviceScreenUiState> =
       combine(
-              _deviceUiModel.asStateFlow(),
-              _allEndpointUiModels.asStateFlow(),
-              _msgDialogInfo.asStateFlow(),
+              deviceUiModel,
+              allEndpointUiModels,
+              msgDialogInfo,
               devicesStateRepository.devicesStateFlow,
-              devicesStateRepository.lastUpdatedEndpointState
-                  .asFlow()
-                  .onStart { emit(devicesStateRepository.lastUpdatedEndpointState.value) },
+              devicesStateRepository.lastUpdatedEndpointState.asFlow().onStart {
+                emit(devicesStateRepository.lastUpdatedEndpointState.value)
+              },
           ) {
               deviceUiModel,
               allEndpointUiModels,
@@ -100,10 +104,9 @@ constructor(
               lastUpdatedEndpointState,
             ->
             val isOnline =
-                devicesState.nodesList.firstOrNull { it.nodeId == deviceUiModel?.nodeId?.toLong() }
-                    ?.online
-                    ?: deviceUiModel?.isOnline
-                    ?: true
+                devicesState.nodesList
+                    .firstOrNull { it.nodeId == deviceUiModel?.nodeId?.toLong() }
+                    ?.online ?: deviceUiModel?.isOnline ?: true
             DeviceScreenUiState(
                 device = deviceUiModel,
                 allEndpointUiModels = allEndpointUiModels,

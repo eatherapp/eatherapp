@@ -91,10 +91,8 @@ import io.aether.android.TaskStatus
 import io.aether.android.commissioning.AppCommissioningService
 import io.aether.android.isMultiAdminCommissioning
 import io.aether.android.isOnDisplayString
-import io.aether.android.matter.DeviceTypeId
 import io.aether.android.matter.NodeId
 import io.aether.android.matter.getDeviceTypeIconId
-import io.aether.android.screens.common.DialogInfo
 import io.aether.android.screens.common.MsgAlertDialog
 import io.aether.android.screens.thread.getActivity
 import io.aether.android.spacing

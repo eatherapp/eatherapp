@@ -35,11 +35,9 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import io.aether.android.MatterFabricState
 import io.aether.android.R
 import io.aether.android.data.DevicesStateRepository
 import io.aether.android.matter.NodeId
-import io.aether.android.screens.common.DialogInfo
 import io.aether.android.screens.common.LoadingIndicator
 import io.aether.android.screens.common.MsgAlertDialog
 import io.aether.android.screens.device.control.ColorTemperatureDeviceControl
